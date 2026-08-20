@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>search-neo · Powered By Vexify</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #141926;
+    --panel2: #1b2233;
+    --border: #26304a;
+    --text: #e6ecf5;
+    --muted: #8b97ad;
+    --accent: #7c5cff;
+    --accent2: #00d4ff;
+    --good: #34d399;
+    --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #1b2240 0%, var(--bg) 60%);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 48px 20px 80px; }
+  .logo {
+    display: flex; align-items: center; gap: 10px; justify-content: center;
+    font-size: 40px; font-weight: 800; letter-spacing: 1px; margin-bottom: 6px;
+  }
+  .logo span { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 30px; }
+  .sub b { color: var(--accent2); font-weight: 600; }
+  form { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  input[type=text] {
+    flex: 1; min-width: 260px; max-width: 640px;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 12px; padding: 14px 18px; font-size: 15px; outline: none;
+    transition: border .2s, box-shadow .2s;
+  }
+  input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,92,255,.25); }
+  button {
+    background: linear-gradient(120deg, var(--accent), var(--accent2));
+    border: 0; color: #0b0e14; font-weight: 700; font-size: 15px;
+    padding: 14px 26px; border-radius: 12px; cursor: pointer; transition: transform .1s, filter .2s;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:active { transform: scale(.97); }
+  #status { text-align: center; color: var(--muted); margin-top: 22px; font-size: 14px; }
+  .bar { margin-top: 20px; height: 3px; border-radius: 3px; overflow: hidden; background: var(--panel2); }
+  .bar i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .3s; }
+  .answer {
+    margin-top: 32px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px 22px; line-height: 1.7; display: none;
+  }
+  .answer .tag { display: inline-block; font-size: 11px; padding: 2px 10px; border-radius: 99px; background: rgba(124,92,255,.18); color: var(--accent2); margin-bottom: 10px; }
+  .answer p { font-size: 15px; white-space: pre-wrap; }
+  .metric { margin-top: 24px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .metric div { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; font-size: 12px; color: var(--muted); }
+  .metric b { color: var(--text); }
+  .results { margin-top: 14px; display: none; }
+  .results h2 { font-size: 14px; color: var(--muted); margin: 24px 0 12px; font-weight: 600; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; margin-bottom: 12px; transition: border .15s, transform .15s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .card .rank { font-size: 11px; color: var(--warn); font-weight: 700; margin-bottom: 4px; }
+  .card a { color: var(--accent2); text-decoration: none; font-size: 16px; font-weight: 600; word-break: break-all; }
+  .card a:hover { text-decoration: underline; }
+  .card .url { color: var(--muted); font-size: 12px; margin: 4px 0 8px; word-break: break-all; }
+  .card .snippet { color: var(--text); font-size: 13.5px; line-height: 1.6; opacity: .9; }
+  .badges { margin-top: 10px; display: flex; gap: 6px; }
+  .badge { font-size: 10.5px; padding: 2px 8px; border-radius: 99px; }
+  .badge.bing { background: #003b76; color: #9fd7ff; }
+  .badge.baidu { background: #2932e1; color: #cfe0ff; }
+  .badge.both { background: rgba(52,211,153,.15); color: var(--good); }
+  .badge.score { background: var(--panel2); color: var(--muted); }
+  .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 60px; }
+  .err { color: #f87171; background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.3); border-radius: 12px; padding: 14px 18px; margin-top: 30px; display: none; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">◈<span>search-neo</span></div>
+  <p class="sub">专为 AI 设计的聚合搜索引擎 · 爬取 <b>Bing</b> 与 <b>百度</b> · 按正确度自动精选 · Powered By <b>Vexify</b></p>
+
+  <form id="form">
+    <input type="text" id="q" name="q" placeholder="输入查询，例如：毛遂自荐的主人公是谁" autocomplete="off" autofocus />
+    <button type="submit">搜索</button>
+  </form>
+
+  <div id="status" class="hidden"></div>
+  <div class="bar hidden" id="bar"><i></i></div>
+
+  <div class="answer hidden" id="answer">
+    <span class="tag">AI 精选答案</span>
+    <p id="answerText"></p>
+    <div class="metric" id="metrics"></div>
+  </div>
+
+  <div class="results" id="results">
+    <h2>候选结果（按正确度排序）</h2>
+    <div id="list"></div>
+  </div>
+
+  <div id="error" class="err"></div>
+
+  <div class="footer">Powered By Vexify · search-neo v1.0 · 结果来自 Bing + 百度，交叉验证后按正确度排序</div>
+</div>
+
+<script>
+const form = document.getElementById("form");
+const input = document.getElementById("q");
+const status = document.getElementById("status");
+const bar = document.getElementById("bar");
+const answer = document.getElementById("answer");
+const answerText = document.getElementById("answerText");
+const metrics = document.getElementById("metrics");
+const results = document.getElementById("results");
+const list = document.getElementById("list");
+const errorBox = document.getElementById("error");
+
+function show(el) { el.classList.remove("hidden"); }
+function hide(el) { el.classList.add("hidden"); }
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s || "";
+  return d.innerHTML;
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = input.value.trim();
+  if (!q) return;
+
+  hide(answer); hide(results); hide(errorBox);
+  show(status); show(bar);
+  status.textContent = "正在同时爬取 Bing 与 百度…";
+  let w = 0;
+  const t = setInterval(() => { w = Math.min(92, w + Math.random() * 14); bar.firstElementChild.style.width = w + "%"; }, 200);
+
+  try {
+    const res = await fetch("/search?q=" + encodeURIComponent(q));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "请求失败");
+    bar.firstElementChild.style.width = "100%";
+    setTimeout(() => { hide(bar); hide(status); }, 200);
+
+    if (data.summary && data.summary.answer) {
+      show(answer);
+      answerText.textContent = data.summary.answer;
+      const engines = data.engines ? Object.entries(data.engines).map(([k, v]) => `${k}: ${v.total}条`).join(" · ") : "";
+      metrics.innerHTML =
+        `<div>可信度 <b>${data.summary.confidence}%</b></div>` +
+        `<div>AI 审核 <b>${data.ai_verified ? "是" : "否"}</b></div>` +
+        `<div>来源 <b>${data.engineCount || 0} 引擎</b></div>` +
+        (engines ? `<div>${engines}</div>` : "") +
+        `<div>耗时 <b>${data.meta.elapsedMs}ms</b></div>`;
+    }
+
+    if (data.results && data.results.length) {
+      show(results);
+      list.innerHTML = data.results.slice(0, 10).map((r, i) => {
+        const both = r.domainConsensus || r.groupSize > 1;
+        const badges = both
+          ? `<span class="badge both">✓ 双引擎一致</span>`
+          : `<span class="badge ${r.engine}">${r.engine}</span>`;
+        return `<div class="card">
+          <div class="rank">#${r.rank} · 正确度 ${r.score}/99</div>
+          <a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>
+          <div class="url">${esc(r.url)}</div>
+          <div class="snippet">${esc(r.snippet)}</div>
+          <div class="badges">${badges}<span class="badge score">score ${r.score}</span></div>
+        </div>`;
+      }).join("");
+    } else {
+      show(errorBox);
+      errorBox.textContent = "未检索到结果，换个关键词试试。";
+    }
+  } catch (err) {
+    clearInterval(t);
+    hide(bar); hide(status);
+    show(errorBox);
+    errorBox.textContent = "错误：" + (err.message || "网络异常");
+  }
+});
+window.addEventListener("DOMContentLoaded", () => input.focus());
+</script>
+</body>
+</html>

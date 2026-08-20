@@ -1,0 +1,15 @@
+{
+  "name": "search-neo",
+  "version": "1.0.0",
+  "description": "AI-designed search engine — crawls Bing & Baidu, ranks results by correctness. Powered By Vexify.",
+  "main": "src/server.js",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/rank.test.js"
+  },
+  "license": "MIT"
+}
