@@ -20,11 +20,34 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+};
+
+// Basic in-memory rate limiter: 20 search requests per minute per IP
+const rateMap = new Map();
+const RATE_LIMIT = 20;
+const RATE_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateMap.get(ip) || { count: 0, resetAt: now + RATE_WINDOW_MS };
+  if (now > entry.resetAt) {
+    entry.count = 0;
+    entry.resetAt = now + RATE_WINDOW_MS;
+  }
+  entry.count++;
+  rateMap.set(ip, entry);
+  return entry.count <= RATE_LIMIT;
+}
+
 function sendJson(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    ...SECURITY_HEADERS,
     ...CORS,
   });
   res.end(body);
@@ -71,6 +94,14 @@ const server = http.createServer(async (req, res) => {
 
   const isSearch = u.pathname === "/search" || u.pathname === "/api/search";
   if (isSearch) {
+    const ip =
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress ||
+      "unknown";
+    if (!checkRateLimit(ip)) {
+      res.writeHead(429, { "Content-Type": "application/json; charset=utf-8", ...CORS });
+      return res.end(JSON.stringify({ error: "Too many requests. Try again in a minute." }));
+    }
     const q = (u.searchParams.get("q") || "").trim();
     if (!q) return sendJson(res, 400, { error: "Missing required query param: q" });
 
