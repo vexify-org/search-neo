@@ -1,4 +1,4 @@
-import { cleanText } from "./net.js";
+import { cleanText, normUrlKey } from "./net.js";
 
 const STOPWORDS = new Set(
   ("a an the and or but if of to in on for with at by from as is are was were be been being " +
@@ -147,7 +147,7 @@ export function rankResults(results, query) {
     if (cjk) relevance *= 1.15;
 
     // Exact-URL consensus: both engines returned the identical page.
-    const group = byKey.get(normKey(url)) || [];
+    const group = byKey.get(normUrlKey(url)) || [];
     const groupSize = group.length;
     const groupEngines = group.length > 1 ? ["bing", "baidu"] : [r.engine];
     const consensusBoost = group.length > 1 ? 12 : 0;
@@ -188,22 +188,6 @@ export function rankResults(results, query) {
   scored.sort((a, b) => b.score - a.score);
 
   return scored;
-}
-
-/** Normalized full-URL key for exact-consensus grouping. */
-function normKey(url) {
-  try {
-    const u = new URL(url);
-    const host = u.hostname.replace(/^www\./, "");
-    const path = u.pathname.replace(/\/+$/, "") || "/";
-    const keys = [...u.searchParams.keys()]
-      .sort()
-      .slice(0, 3)
-      .map((k) => `${k}=${u.searchParams.get(k) || ""}`);
-    return `${host}${path}?${keys.join("&")}`;
-  } catch {
-    return url;
-  }
 }
 
 /**
