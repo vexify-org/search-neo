@@ -1,6 +1,6 @@
 {
   "name": "search-neo",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "AI-designed search engine — crawls Bing & Baidu, ranks results by correctness. Powered By Vexify.",
   "main": "src/server.js",
   "type": "module",
