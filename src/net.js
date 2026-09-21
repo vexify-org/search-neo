@@ -31,7 +31,14 @@ const cookieJar = new Map();
 function storeCookies(res, url) {
   try {
     const host = new URL(url).hostname;
-    const setCookies = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
+    // headers.getSetCookie() is Node 18+; fall back to raw header string for older versions.
+    let setCookies = [];
+    if (res.headers.getSetCookie) {
+      setCookies = res.headers.getSetCookie();
+    } else {
+      const raw = res.headers.get("set-cookie");
+      if (raw) setCookies = Array.isArray(raw) ? raw : [raw];
+    }
     if (!setCookies.length) return;
     const jar = cookieJar.get(host) || new Map();
     for (const sc of setCookies) {
@@ -58,31 +65,39 @@ function jarHeader(url) {
   }
 }
 
-export async function fetchHtml(url, { timeout = 20000, redirect = "follow", extraHeaders = {} } = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  const cookie = jarHeader(url);
-  try {
-    const res = await fetch(url, {
-      headers: {
-        ...DEFAULT_HEADERS,
-        ...(cookie ? { Cookie: cookie } : {}),
-        ...extraHeaders,
-      },
-      redirect,
-      signal: controller.signal,
-    });
-    storeCookies(res, url);
-    const html = await res.text();
-    return {
-      status: res.status,
-      html,
-      finalUrl: res.url || url,
-      headers: Object.fromEntries(res.headers.entries()),
-    };
-  } finally {
-    clearTimeout(timer);
+export async function fetchHtml(url, { timeout = 20000, redirect = "follow", extraHeaders = {}, retries = 1 } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    const cookie = jarHeader(url);
+    try {
+      const res = await fetch(url, {
+        headers: {
+          ...DEFAULT_HEADERS,
+          ...(cookie ? { Cookie: cookie } : {}),
+          ...extraHeaders,
+        },
+        redirect,
+        signal: controller.signal,
+      });
+      storeCookies(res, url);
+      const html = await res.text();
+      clearTimeout(timer);
+      return {
+        status: res.status,
+        html,
+        finalUrl: res.url || url,
+        headers: Object.fromEntries(res.headers.entries()),
+      };
+    } catch (err) {
+      lastError = err;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (attempt < retries) await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
   }
+  throw lastError;
 }
 
 const NAMED_ENTITIES = {
@@ -93,11 +108,14 @@ const NAMED_ENTITIES = {
 
 /** Strip HTML tags, decode common entities, collapse whitespace. */
 export function cleanText(input = "") {
+  if (!input) return "";
   return input
     .replace(/<[^>]*>/g, " ")
-    .replace(/&#(x[0-9a-f]+|\d+);/gi, (m, num) => {
+    // Separate regex for hex (&#xHEX;) vs decimal (&#NNN;) avoids the 'x' being
+    // included in the capture group and causing parseInt("x4E2D",16)->NaN.
+    .replace(/&#x([0-9a-fA-F]+);|&#[xX]?(\d+);/g, (m, hex, dec) => {
       try {
-        return String.fromCodePoint(parseInt(num, num[0] === "x" || num[0] === "X" ? 16 : 10));
+        return String.fromCodePoint(parseInt(hex ?? dec, hex !== undefined ? 16 : 10));
       } catch {
         return "";
       }
@@ -113,5 +131,21 @@ export function decodeUrl(s = "") {
     return decodeURIComponent(s);
   } catch {
     return s;
+  }
+}
+
+/** Normalized URL key for exact-consensus grouping (exported for rank.js reuse). */
+export function normUrlKey(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    const path = u.pathname.replace(/\/+$/, "") || "/";
+    const keys = [...u.searchParams.keys()]
+      .sort()
+      .slice(0, 3)
+      .map((k) => `${k}=${u.searchParams.get(k) || ""}`);
+    return `${host}${path}?${keys.join("&")}`;
+  } catch {
+    return url;
   }
 }
